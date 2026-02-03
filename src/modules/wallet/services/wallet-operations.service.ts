@@ -90,6 +90,13 @@ export class WalletOperationsService {
       throw new BadRequestException('Exchange rate not available for this pair');
     }
 
+    // Validate sufficient balance before starting transaction
+    await this.walletService.validateSufficientBalance(
+      userId, 
+      convertDto.fromCurrency, 
+      convertDto.amount
+    );
+
     const toAmount = convertDto.amount * rate;
 
     const transaction = await this.transactionService.createConversionTransaction(
@@ -144,6 +151,13 @@ export class WalletOperationsService {
       throw new BadRequestException('Rate has changed significantly. Please try again.');
     }
 
+    // Validate sufficient balance before starting transaction
+    await this.walletService.validateSufficientBalance(
+      userId, 
+      tradeDto.fromCurrency, 
+      tradeDto.amount
+    );
+
     const toAmount = tradeDto.amount * rate;
 
     const transaction = await this.transactionService.createTradeTransaction(
@@ -177,7 +191,7 @@ export class WalletOperationsService {
     await this.transactionService.completeTransaction(transaction.id);
 
     return {
-      message: 'Trade executed successfully',
+      message: 'Currency traded successfully',
       transactionId: transaction.id,
       fromAmount: tradeDto.amount,
       fromCurrency: tradeDto.fromCurrency,

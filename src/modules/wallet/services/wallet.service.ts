@@ -78,21 +78,58 @@ export class WalletService {
     }
   }
 
+  async validateSufficientBalance(
+    userId: string, 
+    currency: Currency, 
+    amount: number
+  ): Promise<void> {
+    if (amount <= 0) {
+      throw new BadRequestException('Amount must be greater than 0');
+    }
+
+    const wallet = await this.getWalletByCurrency(userId, currency);
+    
+    // Calculate available balance (total - frozen)
+    const availableBalance = Number(wallet.balance) - Number(wallet.frozenBalance);
+    
+    if (availableBalance < amount) {
+      throw new BadRequestException({
+        error: 'INSUFFICIENT_BALANCE',
+        message: 'Insufficient balance',
+        available: availableBalance,
+        requested: amount,
+        currency: currency,
+        totalBalance: Number(wallet.balance),
+        frozenBalance: Number(wallet.frozenBalance)
+      });
+    }
+
+    // Currency-specific rules
+    if (currency === Currency.NGN) {
+      const minBalance = 100; // NGN minimum balance
+      if (availableBalance - amount < minBalance) {
+        throw new BadRequestException({
+          error: 'MINIMUM_BALANCE_REQUIRED',
+          message: `Minimum balance of ${minBalance} ${currency} required`,
+          available: availableBalance,
+          requested: amount,
+          minimumRequired: minBalance,
+          currency: currency
+        });
+      }
+    }
+  }
+
   async freezeBalance(
     userId: string,
     currency: Currency,
     amount: number,
     transactionalEntityManager?: EntityManager,
   ): Promise<Wallet> {
-    if (amount <= 0) {
-      throw new BadRequestException('Amount must be greater than 0');
-    }
+    // Validate sufficient balance before freezing
+    await this.validateSufficientBalance(userId, currency, amount);
 
     const wallet = await this.getWalletByCurrency(userId, currency);
-
-    if (Number(wallet.balance) < amount) {
-      throw new BadRequestException('Insufficient balance');
-    }
 
     wallet.balance = Number(wallet.balance) - amount;
     wallet.frozenBalance = Number(wallet.frozenBalance) + amount;
