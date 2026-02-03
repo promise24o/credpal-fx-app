@@ -7,6 +7,8 @@ import { BadRequestException } from '@nestjs/common';
 import { FundWalletDto } from '../dto/fund-wallet.dto';
 import { ConvertCurrencyDto } from '../dto/convert-currency.dto';
 import { TradeCurrencyDto } from '../dto/trade-currency.dto';
+import { InjectEntityManager } from '@nestjs/typeorm';
+import { EntityManager } from 'typeorm';
 
 @Injectable()
 export class WalletOperationsService {
@@ -14,32 +16,76 @@ export class WalletOperationsService {
     private walletService: WalletService,
     private transactionService: TransactionService,
     private fxService: FxService,
+    @InjectEntityManager()
+    private entityManager: EntityManager,
   ) {}
 
   async fundWallet(userId: string, fundWalletDto: FundWalletDto) {
-    const transaction = await this.transactionService.createTransaction(
+    // 1. Check idempotency to prevent duplicate requests
+    if (fundWalletDto.idempotencyKey) {
+      const existingTx = await this.transactionService.findByIdempotencyKey(
+        userId, 
+        fundWalletDto.idempotencyKey
+      );
+      if (existingTx) {
+        return {
+          message: 'Transaction already processed',
+          transactionId: existingTx.id,
+          amount: existingTx.fromAmount,
+          currency: existingTx.fromCurrency,
+        };
+      }
+    }
+
+    // 2. Check for existing pending funding transaction
+    const pendingTx = await this.transactionService.findPendingTransaction(
       userId,
       TransactionType.FUNDING,
-      fundWalletDto.currency,
-      fundWalletDto.amount,
-      fundWalletDto.description || 'Wallet funding',
+      fundWalletDto.currency
     );
 
-    await this.walletService.fundWallet(
-      userId,
-      fundWalletDto.currency,
-      fundWalletDto.amount,
-      fundWalletDto.description,
-    );
+    if (pendingTx) {
+      throw new BadRequestException('Funding already in progress');
+    }
 
-    await this.transactionService.completeTransaction(transaction.id);
+    // 3. Use database transaction with locking to prevent race conditions
+    return await this.entityManager.transaction(async manager => {
+      // Lock user wallet to prevent concurrent operations
+      const wallet = await manager.findOne('Wallet', {
+        where: { userId, currency: fundWalletDto.currency },
+        lock: { mode: 'pessimistic_write' }
+      });
 
-    return {
-      message: 'Wallet funded successfully',
-      transactionId: transaction.id,
-      amount: fundWalletDto.amount,
-      currency: fundWalletDto.currency,
-    };
+      const transaction = await this.transactionService.createTransaction(
+        userId,
+        TransactionType.FUNDING,
+        fundWalletDto.currency,
+        fundWalletDto.amount,
+        fundWalletDto.description || 'Wallet funding',
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        manager,
+        fundWalletDto.idempotencyKey
+      );
+
+      await this.walletService.fundWallet(
+        userId,
+        fundWalletDto.currency,
+        fundWalletDto.amount,
+        fundWalletDto.description,
+      );
+
+      await this.transactionService.completeTransaction(transaction.id, manager);
+
+      return {
+        message: 'Wallet funded successfully',
+        transactionId: transaction.id,
+        amount: fundWalletDto.amount,
+        currency: fundWalletDto.currency,
+      };
+    });
   }
 
   async convertCurrency(userId: string, convertDto: ConvertCurrencyDto) {

@@ -5,6 +5,7 @@ import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { FundWalletDto } from '../dto/fund-wallet.dto';
 import { ConvertCurrencyDto } from '../dto/convert-currency.dto';
 import { TradeCurrencyDto } from '../dto/trade-currency.dto';
+import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('Wallet')
 @Controller('wallet')
@@ -21,6 +22,7 @@ export class WalletController {
   }
 
   @Post('fund')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiOperation({ summary: 'Fund wallet with specified currency' })
   @ApiResponse({ status: 200, description: 'Wallet funded successfully' })
   async fundWallet(@Req() req, @Body() fundWalletDto: FundWalletDto) {

@@ -23,6 +23,7 @@ export class TransactionService {
     rate?: number,
     metadata?: Record<string, any>,
     transactionalEntityManager?: EntityManager,
+    idempotencyKey?: string,
   ): Promise<Transaction> {
     const transaction = {
       userId,
@@ -35,7 +36,10 @@ export class TransactionService {
       description,
       reference: this.generateReference(),
       status: TransactionStatus.PENDING,
-      metadata,
+      metadata: {
+        ...metadata,
+        idempotencyKey,
+      },
     };
 
     if (transactionalEntityManager) {
@@ -268,5 +272,29 @@ export class TransactionService {
       .getRawOne();
     
     return parseFloat(result?.total) || 0;
+  }
+
+  async findByIdempotencyKey(userId: string, idempotencyKey: string): Promise<Transaction | null> {
+    return this.transactionRepository
+      .createQueryBuilder('transaction')
+      .where('transaction.userId = :userId', { userId })
+      .andWhere("transaction.metadata->>'idempotencyKey' = :idempotencyKey", { idempotencyKey })
+      .getOne();
+  }
+
+  async findPendingTransaction(
+    userId: string,
+    type: TransactionType,
+    currency: Currency,
+  ): Promise<Transaction | null> {
+    return this.transactionRepository.findOne({
+      where: {
+        userId,
+        type,
+        fromCurrency: currency,
+        status: TransactionStatus.PENDING,
+      },
+      order: { createdAt: 'DESC' },
+    });
   }
 }
