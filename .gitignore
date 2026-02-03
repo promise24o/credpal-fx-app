@@ -34,6 +34,7 @@ lerna-debug.log*
 !.vscode/*.code-snippets
 
 # Local Environment files
+.env
 .env.local
 .env.development.local
 .env.test.local
