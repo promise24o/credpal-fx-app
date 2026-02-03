@@ -7,6 +7,7 @@ import { AuthController } from './controllers/auth.controller';
 import { AuthService } from './services/auth.service';
 import { UserService } from './services/user.service';
 import { EmailService } from './services/email.service';
+import { AuthOperationsService } from './services/auth-operations.service';
 import { User } from './entities/user.entity';
 import { JwtStrategy } from '../../common/strategies/jwt.strategy';
 import { WalletModule } from '../wallet/wallet.module';
@@ -26,7 +27,7 @@ import { WalletModule } from '../wallet/wallet.module';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, UserService, EmailService, JwtStrategy],
-  exports: [AuthService, UserService],
+  providers: [AuthService, UserService, EmailService, AuthOperationsService, JwtStrategy],
+  exports: [AuthService, UserService, AuthOperationsService],
 })
 export class AuthModule {}

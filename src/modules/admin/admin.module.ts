@@ -1,10 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AdminController } from './controllers/admin.controller';
-import { UserService } from '../auth/services/user.service';
-import { WalletService } from '../wallet/services/wallet.service';
-import { TransactionService } from '../transaction/services/transaction.service';
-import { FxService } from '../fx/services/fx.service';
+import { AdminOperationsService } from './services/admin-operations.service';
 import { User } from '../auth/entities/user.entity';
 import { Wallet } from '../wallet/entities/wallet.entity';
 import { Transaction } from '../transaction/entities/transaction.entity';
@@ -22,7 +19,7 @@ import { FxModule } from '../fx/fx.module';
     FxModule,
   ],
   controllers: [AdminController],
-  providers: [],
-  exports: [],
+  providers: [AdminOperationsService],
+  exports: [AdminOperationsService],
 })
 export class AdminModule {}
