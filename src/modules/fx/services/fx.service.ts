@@ -31,14 +31,16 @@ export class FxService {
     }
 
     const cacheKey = `${fromCurrency}_${toCurrency}`;
-    const cached = this.rateCache.get(cacheKey);
-
-    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
-      return cached.rate;
+    
+    // Check cache first
+    const cachedRate = this.rateCache.get(cacheKey);
+    if (cachedRate && Date.now() - cachedRate.timestamp < 5 * 60 * 1000) { // 5 minutes
+      return cachedRate.rate;
     }
 
     try {
-      const rate = await this.fetchRateFromAPI(fromCurrency, toCurrency);
+      // Use retry logic for API calls
+      const rate = await this.fetchRateFromAPIWithRetry(fromCurrency, toCurrency);
       
       if (rate) {
         this.rateCache.set(cacheKey, {
@@ -51,10 +53,12 @@ export class FxService {
 
       return rate;
     } catch (error) {
-      this.logger.error(`Failed to fetch rate for ${fromCurrency}-${toCurrency}:`, error);
+      this.logger.error(`Failed to fetch rate for ${fromCurrency}-${toCurrency} after retries:`, error);
       
+      // FALLBACK: Use database rate if API fails
       const dbRate = await this.getRateFromDatabase(fromCurrency, toCurrency);
       if (dbRate) {
+        this.logger.log(`Using database fallback rate for ${fromCurrency}-${toCurrency}: ${dbRate}`);
         this.rateCache.set(cacheKey, {
           rate: dbRate,
           timestamp: Date.now(),
@@ -62,8 +66,42 @@ export class FxService {
         return dbRate;
       }
 
+      this.logger.error(`No rate available for ${fromCurrency}-${toCurrency} (API failed, no database backup)`);
       return null;
     }
+  }
+
+  private async fetchRateFromAPIWithRetry(
+    fromCurrency: Currency, 
+    toCurrency: Currency, 
+    maxRetries: number = 3
+  ): Promise<number | null> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const rate = await this.fetchRateFromAPI(fromCurrency, toCurrency);
+        if (rate) {
+          this.logger.log(`Successfully fetched rate for ${fromCurrency}-${toCurrency} on attempt ${attempt}`);
+          return rate;
+        }
+      } catch (error) {
+        this.logger.warn(`Attempt ${attempt} failed for ${fromCurrency}-${toCurrency}:`, error.message);
+        
+        if (attempt === maxRetries) {
+          this.logger.error(`All ${maxRetries} attempts failed for ${fromCurrency}-${toCurrency}:`, error);
+          throw error;
+        }
+        
+        // Exponential backoff: 2s, 4s, 8s
+        const delay = Math.pow(2, attempt) * 1000;
+        await this.sleep(delay);
+      }
+    }
+    
+    return null;
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   private async fetchRateFromAPI(fromCurrency: Currency, toCurrency: Currency): Promise<number | null> {

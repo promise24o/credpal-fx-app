@@ -166,7 +166,7 @@ export class AuthService {
   }
 
   async verifyEmailConnection(): Promise<boolean> {
-    return this.emailService.verifyConnection();
+    return this.emailService.verifyEmailConnection();
   }
 
   private generateOtp(): string {
