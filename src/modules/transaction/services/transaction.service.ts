@@ -282,6 +282,81 @@ export class TransactionService {
       .getOne();
   }
 
+  async createFundingTransaction(
+    userId: string,
+    currency: Currency,
+    amount: number,
+    description: string,
+    transactionalEntityManager?: EntityManager,
+    idempotencyKey?: string,
+  ): Promise<Transaction> {
+    return this.createTransaction(
+      userId,
+      TransactionType.FUNDING,
+      currency,
+      amount,
+      description,
+      undefined, // toCurrency
+      undefined, // toAmount
+      undefined, // rate
+      undefined, // metadata
+      transactionalEntityManager,
+      idempotencyKey
+    );
+  }
+
+  async createConversionTransaction(
+    userId: string,
+    fromCurrency: Currency,
+    fromAmount: number,
+    toCurrency: Currency,
+    toAmount: number,
+    rate: number,
+    description: string,
+    transactionalEntityManager?: EntityManager,
+    idempotencyKey?: string,
+  ): Promise<Transaction> {
+    return this.createTransaction(
+      userId,
+      TransactionType.CONVERSION,
+      fromCurrency,
+      fromAmount,
+      description,
+      toCurrency,
+      toAmount,
+      rate,
+      undefined, // metadata
+      transactionalEntityManager,
+      idempotencyKey
+    );
+  }
+
+  async createTradeTransaction(
+    userId: string,
+    fromCurrency: Currency,
+    fromAmount: number,
+    toCurrency: Currency,
+    toAmount: number,
+    rate: number,
+    description: string,
+    transactionalEntityManager?: EntityManager,
+    idempotencyKey?: string,
+  ): Promise<Transaction> {
+    return this.createTransaction(
+      userId,
+      TransactionType.TRADE,
+      fromCurrency,
+      fromAmount,
+      description,
+      toCurrency,
+      toAmount,
+      rate,
+      undefined, // metadata
+      transactionalEntityManager,
+      idempotencyKey
+    );
+  }
+
   async findPendingTransaction(
     userId: string,
     type: TransactionType,

@@ -56,16 +56,11 @@ export class WalletOperationsService {
         lock: { mode: 'pessimistic_write' }
       });
 
-      const transaction = await this.transactionService.createTransaction(
+      const transaction = await this.transactionService.createFundingTransaction(
         userId,
-        TransactionType.FUNDING,
         fundWalletDto.currency,
         fundWalletDto.amount,
         fundWalletDto.description || 'Wallet funding',
-        undefined,
-        undefined,
-        undefined,
-        undefined,
         manager,
         fundWalletDto.idempotencyKey
       );
@@ -97,15 +92,14 @@ export class WalletOperationsService {
 
     const toAmount = convertDto.amount * rate;
 
-    const transaction = await this.transactionService.createTransaction(
+    const transaction = await this.transactionService.createConversionTransaction(
       userId,
-      TransactionType.CONVERSION,
       convertDto.fromCurrency,
       convertDto.amount,
-      `Convert ${convertDto.amount} ${convertDto.fromCurrency} to ${convertDto.toCurrency}`,
       convertDto.toCurrency,
       toAmount,
       rate,
+      `Convert ${convertDto.amount} ${convertDto.fromCurrency} to ${convertDto.toCurrency}`
     );
 
     await this.walletService.freezeBalance(
@@ -152,15 +146,14 @@ export class WalletOperationsService {
 
     const toAmount = tradeDto.amount * rate;
 
-    const transaction = await this.transactionService.createTransaction(
+    const transaction = await this.transactionService.createTradeTransaction(
       userId,
-      TransactionType.TRADE,
       tradeDto.fromCurrency,
       tradeDto.amount,
-      `Trade ${tradeDto.amount} ${tradeDto.fromCurrency} to ${tradeDto.toCurrency}`,
       tradeDto.toCurrency,
       toAmount,
       rate,
+      `Trade ${tradeDto.amount} ${tradeDto.fromCurrency} to ${tradeDto.toCurrency}`
     );
 
     await this.walletService.freezeBalance(
